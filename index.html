@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1d4e5a"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><title>إدارة مكتب المحاماة</title>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f5f4;--card:#fff;--ink:#17262b;--mut:#5d6f73;--line:#d9e0e0;--pri:#1d4e5a;--pri-ink:#fff;--acc:#a8402f;--ok:#2f7d5b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10181b;--card:#182327;--ink:#e8eeee;--mut:#9bb0b4;--line:#2a3a3f;--pri:#5fb3c4;--pri-ink:#0b1b1f;--acc:#e0806e;--ok:#5fc59a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10181b;--card:#182327;--ink:#e8eeee;--mut:#9bb0b4;--line:#2a3a3f;--pri:#5fb3c4;--pri-ink:#0b1b1f;--acc:#e0806e;--ok:#5fc59a;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Tajawal,Tahoma,sans-serif;font-size:16px;line-height:1.6;padding-bottom:84px}
+header{padding:20px 16px 8px}
+h1{font-family:Amiri,'Times New Roman',serif;font-size:28px;margin:0;color:var(--pri)}
+h2{font-size:18px;margin:20px 0 8px}
+main{padding:0 16px;max-width:720px;margin:auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.mut{color:var(--mut);font-size:14px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{border-radius:10px;padding:12px;background:var(--pri);color:var(--pri-ink)}
+.stat b{display:block;font-size:26px}
+.stat.w{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.tag{font-size:12px;padding:1px 8px;border-radius:99px;border:1px solid var(--line);color:var(--mut)}
+.tag.on{border-color:var(--ok);color:var(--ok)}
+.late{color:var(--acc);font-weight:700}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--pri);color:var(--pri-ink);border:0;border-radius:8px;padding:9px 16px;font-weight:700}
+.btn.g{background:none;color:var(--pri);border:1px solid var(--line)}
+.ico{background:none;border:0;color:var(--mut);padding:4px 8px}
+nav{position:fixed;bottom:0;inset-inline:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;background:none;border:0;padding:12px 2px;color:var(--mut);font-size:14px}
+nav button.on{color:var(--pri);font-weight:700;box-shadow:inset 0 3px 0 var(--pri)}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);width:min(92vw,420px);padding:16px}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+label{display:block;margin-top:10px;font-size:14px;color:var(--mut)}
+input,select{width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+.empty{text-align:center;padding:28px 10px;color:var(--mut)}
+</style>
+</head>
+<body>
+<header><h1>مكتب المحاماة</h1><div class="mut" id="today"></div></header>
+<main id="app"></main>
+<nav id="nav"></nav>
+<dialog id="dlg"></dialog>
+<script>
+const KEY='lawoffice-v1';
+let S={clients:[],cases:[],hearings:[],pay:[]},tab='home',q='';
+try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const $=s=>document.querySelector(s);
+const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const todayS=new Date().toISOString().slice(0,10);
+const money=n=>Number(n||0).toLocaleString('ar-EG')+' ج';
+const fdate=d=>d?new Date(d+'T00:00').toLocaleDateString('ar-EG',{weekday:'short',day:'numeric',month:'long'}):'';
+const byId=(k,id)=>S[k].find(x=>x.id===id);
+const paid=id=>S.pay.filter(p=>p.case===id).reduce((a,p)=>a+Number(p.amount),0);
+const due=c=>Number(c.fee||0)-paid(c.id);
+const F={
+ clients:{t:'موكل',f:[['name','اسم الموكل'],['phone','الهاتف','tel'],['note','ملاحظات']]},
+ cases:{t:'قضية',f:[['title','عنوان القضية'],['no','رقم القضية'],['client','الموكل','sel:clients'],['court','المحكمة'],['status','الحالة','opt:جارية,مؤجلة,محكوم فيها,مغلقة'],['fee','الأتعاب المتفق عليها','number']]},
+ hearings:{t:'جلسة',f:[['case','القضية','sel:cases'],['date','التاريخ','date'],['time','الوقت','time'],['note','ملاحظات / المطلوب']]},
+ pay:{t:'دفعة',f:[['case','القضية','sel:cases'],['amount','المبلغ','number'],['date','التاريخ','date']]}
+};
+const label=(k,x)=>k==='clients'?x.name:x.title+(x.no?' ('+x.no+')':'');
+function openForm(k,id){
+ const cfg=F[k],x=id?byId(k,id):{date:todayS,status:'جارية'};
+ const fields=cfg.f.map(([n,l,t])=>{
+  let inp;
+  if(t&&t.startsWith('sel:')){const s=t.slice(4);inp=`<select name="${n}"><option value="">— اختر —</option>${S[s].map(o=>`<option value="${o.id}" ${x[n]===o.id?'selected':''}>${esc(label(s,o))}</option>`).join('')}</select>`}
+  else if(t&&t.startsWith('opt:')){inp=`<select name="${n}">${t.slice(4).split(',').map(o=>`<option ${x[n]===o?'selected':''}>${o}</option>`).join('')}</select>`}
+  else inp=`<input name="${n}" type="${t||'text'}" value="${esc(x[n])}">`;
+  return `<label>${l}${inp}</label>`}).join('');
+ const d=$('#dlg');
+ d.innerHTML=`<h2 style="margin-top:0">${id?'تعديل':'إضافة'} ${cfg.t}</h2><div id="f">${fields}</div><div class="row" style="margin-top:16px"><button class="btn" id="ok">حفظ</button><button class="btn g" id="no">إلغاء</button></div>`;
+ d.showModal();
+ if(k==='clients'&&navigator.contacts&&navigator.contacts.select){
+  const b=document.createElement('button');b.className='btn g';b.textContent='اختيار من جهات الاتصال';b.style.marginTop='10px';
+  b.onclick=async()=>{try{const r=await navigator.contacts.select(['name','tel'],{multiple:false});if(r[0]){if(r[0].name&&r[0].name[0])d.querySelector('[name=name]').value=r[0].name[0];if(r[0].tel&&r[0].tel[0])d.querySelector('[name=phone]').value=r[0].tel[0]}}catch(e){}};
+  $('#f').after(b);
+ }
+ $('#no').onclick=()=>d.close();
+ $('#ok').onclick=()=>{
+  const o=id?x:{id:Date.now().toString(36)};
+  d.querySelectorAll('#f [name]').forEach(e=>o[e.name]=e.value.trim());
+  if(!id)S[k].push(o);
+  save();d.close();render();
+ };
+}
+function del(k,id){
+ if(!confirm('هل تريد الحذف نهائيًا؟'))return;
+ S[k]=S[k].filter(x=>x.id!==id);
+ if(k==='cases'){S.hearings=S.hearings.filter(h=>h.case!==id);S.pay=S.pay.filter(p=>p.case!==id)}
+ save();render();
+}
+const acts=(k,id)=>`<span><button class="ico" onclick="openForm('${k}','${id}')" aria-label="تعديل">✎</button><button class="ico" onclick="del('${k}','${id}')" aria-label="حذف">✕</button></span>`;
+const addBtn=k=>`<div class="row"><h2>${{clients:'الموكلون',cases:'القضايا',hearings:'الجلسات',pay:'الدفعات'}[k]}</h2><button class="btn" onclick="openForm('${k}')">+ ${F[k].t}</button></div>`;
+const empty=t=>`<div class="empty">${t}</div>`;
+function hearingCard(h){
+ const c=byId('cases',h.case),late=h.date<todayS,cl=c&&byId('clients',c.client);
+ return `<div class="card"><div class="row"><b>${esc(c?c.title:'قضية محذوفة')}</b>${acts('hearings',h.id)}</div><div class="${late?'late':'mut'}">${fdate(h.date)} ${esc(h.time)}${late?' — فاتت':''}</div>${h.note?`<div class="mut">${esc(h.note)}</div>`:''}<button class="btn g" style="margin-top:8px" onclick="ics([byId('hearings','${h.id}')])">أضف للتقويم مع تذكير</button>${cl&&cl.phone?`<a class="btn g" style="margin-top:8px;margin-inline-start:6px;display:inline-block;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${wa(cl.phone)}?text=${encodeURIComponent('تذكير بجلسة قضية '+c.title+' يوم '+fdate(h.date)+' الساعة '+h.time)}">ذكّر الموكل</a>`:''}</div>`}
+const V={
+ home(){
+  const up=S.hearings.filter(h=>h.date>=todayS).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  const open=S.cases.filter(c=>c.status!=='مغلقة').length;
+  const owed=S.cases.reduce((a,c)=>a+Math.max(0,due(c)),0);
+  const week=up.filter(h=>(new Date(h.date)-new Date(todayS))/864e5<=7).length;
+  let h=`<div class="stats"><div class="stat"><b>${open}</b>قضايا مفتوحة</div><div class="stat"><b>${week}</b>جلسات خلال أسبوع</div><div class="stat w"><b>${S.clients.length}</b>موكلون</div><div class="stat w"><b>${money(owed)}</b>أتعاب متبقية</div></div><h2>الجلسات القادمة</h2>`;
+  h+=up.length?up.slice(0,5).map(hearingCard).join(''):empty('لا توجد جلسات قادمة. أضف جلسة من تبويب «الجلسات».');
+  if(!S.clients.length&&!S.cases.length)h+=`<div class="empty"><button class="btn g" onclick="seed()">تحميل بيانات تجريبية</button></div>`;
+  h+=`<h2>نسخة احتياطية</h2><div class="card"><div class="mut">احفظ كل بياناتك في ملف، واستعدها وقت الحاجة.</div><div class="row" style="margin-top:10px;justify-content:flex-start"><button class="btn" onclick="exportData()">حفظ نسخة</button><button class="btn g" onclick="$('#imp').click()">استعادة نسخة</button></div></div>`;
+  return h},
+ cases(){
+  const l=S.cases.filter(c=>(c.title+c.no+c.court+((byId('clients',c.client)||{}).name||'')).includes(q));
+  return addBtn('cases')+`<input placeholder="بحث بالعنوان أو الرقم أو الموكل" value="${esc(q)}" oninput="q=this.value;render(true)" style="margin-bottom:10px">`+
+  (l.length?l.map(c=>{const cl=byId('clients',c.client),d=due(c);return `<div class="card"><div class="row"><b>${esc(c.title)}</b>${acts('cases',c.id)}</div><div class="mut">${esc(c.no)} · ${esc(c.court)}</div><div class="row" style="margin-top:6px"><span>${esc(cl?cl.name:'بدون موكل')}</span><span class="tag ${c.status==='جارية'?'on':''}">${esc(c.status)}</span></div><div class="mut">متبقي: <b class="${d>0?'late':''}">${money(d)}</b></div></div>`}).join(''):empty('لا توجد قضايا مطابقة.'))},
+ clients(){
+  return addBtn('clients')+(S.clients.length?S.clients.map(c=>`<div class="card"><div class="row"><b>${esc(c.name)}</b>${acts('clients',c.id)}</div>${c.phone?`<div class="row" style="justify-content:flex-start;gap:14px"><a href="tel:${esc(c.phone)}">اتصال</a><a href="https://wa.me/${wa(c.phone)}" target="_blank" rel="noopener">واتساب</a><a href="sms:${esc(c.phone)}">رسالة</a><span class="mut">${esc(c.phone)}</span></div>`:''}<div class="mut">${S.cases.filter(x=>x.client===c.id).length} قضايا</div>${c.note?`<div class="mut">${esc(c.note)}</div>`:''}</div>`).join(''):empty('أضف أول موكل لمكتبك.'))},
+ hearings(){
+  const l=[...S.hearings].sort((a,b)=>a.date.localeCompare(b.date));
+  return addBtn('hearings')+(S.hearings.length?`<button class="btn g" style="margin-bottom:10px" onclick="ics(S.hearings.filter(h=>h.date>=todayS))">إضافة كل الجلسات القادمة للتقويم</button>`:'')+(l.length?l.map(hearingCard).join(''):empty('لا توجد جلسات مسجلة.'))},
+ fees(){
+  const l=[...S.pay].sort((a,b)=>b.date.localeCompare(a.date));
+  return `<h2>أرصدة القضايا</h2>`+(S.cases.length?S.cases.map(c=>`<div class="card row"><span>${esc(c.title)}<div class="mut">${money(c.fee)} متفق عليها · ${money(paid(c.id))} مدفوعة</div></span><b class="${due(c)>0?'late':''}">${money(due(c))}</b></div>`).join(''):empty('أضف قضية أولًا لتسجيل الأتعاب.'))+addBtn('pay')+
+  (l.length?l.map(p=>{const c=byId('cases',p.case);return `<div class="card row"><span>${esc(c?c.title:'—')}<div class="mut">${fdate(p.date)}</div></span><span><b>${money(p.amount)}</b>${acts('pay',p.id)}</span></div>`}).join(''):empty('لا توجد دفعات مسجلة.'))}
+};
+const T=[['home','الرئيسية'],['cases','القضايا'],['clients','الموكلون'],['hearings','الجلسات'],['fees','الأتعاب']];
+function render(keep){
+ $('#today').textContent=new Date().toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+ $('#nav').innerHTML=T.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';q='';render()">${l}</button>`).join('');
+ const f=document.activeElement;
+ $('#app').innerHTML=V[tab]();
+ if(keep&&f&&f.tagName==='INPUT'){const i=$('#app input');if(i){i.focus();i.setSelectionRange(q.length,q.length)}}
+}
+function seed(){
+ S.clients=[{id:'a1',name:'أحمد محمود',phone:'01000000000'},{id:'a2',name:'شركة النيل للتجارة',phone:'01200000000'}];
+ S.cases=[{id:'c1',title:'نزاع عقد توريد',no:'1450/2026',client:'a2',court:'محكمة القاهرة الاقتصادية',status:'جارية',fee:30000},{id:'c2',title:'دعوى نفقة',no:'88/2026',client:'a1',court:'محكمة الأسرة',status:'مؤجلة',fee:8000}];
+ const d=n=>new Date(Date.now()+n*864e5).toISOString().slice(0,10);
+ S.hearings=[{id:'h1',case:'c1',date:d(3),time:'10:00',note:'تقديم المذكرة'},{id:'h2',case:'c2',date:d(10),time:'09:30',note:''}];
+ S.pay=[{id:'p1',case:'c1',amount:10000,date:todayS}];
+ save();render();
+}
+const wa=p=>{let d=String(p).replace(/\D/g,'');if(d.startsWith('00'))d=d.slice(2);else if(d.startsWith('0'))d='20'+d.slice(1);return d};
+function ics(list){
+ if(!list.length){alert('لا توجد جلسات لإضافتها');return}
+ const p=n=>String(n).padStart(2,'0'),cl=t=>String(t||'').replace(/[,;\n]/g,' ');
+ const stamp=new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z';
+ const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//LawOffice//AR//'];
+ list.forEach(h=>{
+  const c=byId('cases',h.case),[y,m,d]=h.date.split('-'),[hh,mm]=(h.time||'09:00').split(':').map(Number);
+  const e=new Date(+y,+m-1,+d,hh+1,mm),f=x=>`${x.getFullYear()}${p(x.getMonth()+1)}${p(x.getDate())}T${p(x.getHours())}${p(x.getMinutes())}00`;
+  L.push('BEGIN:VEVENT','UID:'+h.id+'@lawoffice','DTSTAMP:'+stamp,'DTSTART:'+f(new Date(+y,+m-1,+d,hh,mm)),'DTEND:'+f(e),'SUMMARY:'+cl('جلسة: '+(c?c.title:'')),'DESCRIPTION:'+cl((c&&c.no?c.no+' ':'')+(c&&c.court?c.court+' ':'')+(h.note||'')),
+   'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:جلسة غدًا','TRIGGER:-P1D','END:VALARM','BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:جلسة خلال ساعة','TRIGGER:-PT1H','END:VALARM','END:VEVENT');
+ });
+ L.push('END:VCALENDAR');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([L.join('\r\n')],{type:'text/calendar'}));a.download='hearings.ics';
+ document.body.appendChild(a);a.click();a.remove();
+}
+function exportData(){
+ const b=new Blob([JSON.stringify(S)],{type:'application/json'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='law-office-backup-'+todayS+'.json';
+ document.body.appendChild(a);a.click();a.remove();
+}
+const imp=document.createElement('input');imp.type='file';imp.accept='.json,application/json';imp.id='imp';imp.hidden=true;document.body.appendChild(imp);
+imp.onchange=()=>{
+ const f=imp.files[0];if(!f)return;
+ const r=new FileReader();
+ r.onload=()=>{
+  try{
+   const d=JSON.parse(r.result);
+   if(!['clients','cases','hearings','pay'].every(k=>Array.isArray(d[k])))throw 0;
+   if(!confirm('سيتم استبدال البيانات الحالية بالنسخة المحفوظة. متابعة؟'))return;
+   S={clients:d.clients,cases:d.cases,hearings:d.hearings,pay:d.pay};save();render();
+  }catch(e){alert('الملف غير صالح. اختر ملف نسخة احتياطية تم حفظه من البرنامج.')}
+  imp.value='';
+ };
+ r.readAsText(f);
+};
+render();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
