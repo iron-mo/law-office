@@ -47,7 +47,7 @@ input,select{width:100%;font:inherit;padding:9px;border:1px solid var(--line);bo
 <dialog id="dlg"></dialog>
 <script>
 const KEY='lawoffice-v1';
-let S={clients:[],cases:[],hearings:[],pay:[]},tab='home',q='';
+let S={clients:[],cases:[],hearings:[],pay:[],docs:[]},tab='home',q='';
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const $=s=>document.querySelector(s);
@@ -92,7 +92,7 @@ function openForm(k,id){
 function del(k,id){
  if(!confirm('هل تريد الحذف نهائيًا؟'))return;
  S[k]=S[k].filter(x=>x.id!==id);
- if(k==='cases'){S.hearings=S.hearings.filter(h=>h.case!==id);S.pay=S.pay.filter(p=>p.case!==id)}
+ if(k==='cases'){S.hearings=S.hearings.filter(h=>h.case!==id);S.pay=S.pay.filter(p=>p.case!==id);S.docs.filter(x=>x.case===id).forEach(x=>tx('readwrite',s=>s.delete(x.id)).catch(()=>{}));S.docs=S.docs.filter(x=>x.case!==id)}
  save();render();
 }
 const acts=(k,id)=>`<span><button class="ico" onclick="openForm('${k}','${id}')" aria-label="تعديل">✎</button><button class="ico" onclick="del('${k}','${id}')" aria-label="حذف">✕</button></span>`;
@@ -110,12 +110,12 @@ const V={
   let h=`<div class="stats"><div class="stat"><b>${open}</b>قضايا مفتوحة</div><div class="stat"><b>${week}</b>جلسات خلال أسبوع</div><div class="stat w"><b>${S.clients.length}</b>موكلون</div><div class="stat w"><b>${money(owed)}</b>أتعاب متبقية</div></div><h2>الجلسات القادمة</h2>`;
   h+=up.length?up.slice(0,5).map(hearingCard).join(''):empty('لا توجد جلسات قادمة. أضف جلسة من تبويب «الجلسات».');
   if(!S.clients.length&&!S.cases.length)h+=`<div class="empty"><button class="btn g" onclick="seed()">تحميل بيانات تجريبية</button></div>`;
-  h+=`<h2>نسخة احتياطية</h2><div class="card"><div class="mut">احفظ كل بياناتك في ملف، واستعدها وقت الحاجة.</div><div class="row" style="margin-top:10px;justify-content:flex-start"><button class="btn" onclick="exportData()">حفظ نسخة</button><button class="btn g" onclick="$('#imp').click()">استعادة نسخة</button></div></div>`;
+  h+=`<h2>نسخة احتياطية</h2><div class="card"><div class="mut">احفظ كل بياناتك في ملف، واستعدها وقت الحاجة. (الملفات المرفقة نفسها لا تدخل في النسخة.)</div><div class="row" style="margin-top:10px;justify-content:flex-start"><button class="btn" onclick="exportData()">حفظ نسخة</button><button class="btn g" onclick="$('#imp').click()">استعادة نسخة</button></div></div>`;
   return h},
  cases(){
   const l=S.cases.filter(c=>(c.title+c.no+c.court+((byId('clients',c.client)||{}).name||'')).includes(q));
   return addBtn('cases')+`<input placeholder="بحث بالعنوان أو الرقم أو الموكل" value="${esc(q)}" oninput="q=this.value;render(true)" style="margin-bottom:10px">`+
-  (l.length?l.map(c=>{const cl=byId('clients',c.client),d=due(c);return `<div class="card"><div class="row"><b>${esc(c.title)}</b>${acts('cases',c.id)}</div><div class="mut">${esc(c.no)} · ${esc(c.court)}</div><div class="row" style="margin-top:6px"><span>${esc(cl?cl.name:'بدون موكل')}</span><span class="tag ${c.status==='جارية'?'on':''}">${esc(c.status)}</span></div><div class="mut">متبقي: <b class="${d>0?'late':''}">${money(d)}</b></div></div>`}).join(''):empty('لا توجد قضايا مطابقة.'))},
+  (l.length?l.map(c=>{const cl=byId('clients',c.client),d=due(c);return `<div class="card"><div class="row"><b>${esc(c.title)}</b>${acts('cases',c.id)}</div><div class="mut">${esc(c.no)} · ${esc(c.court)}</div><div class="row" style="margin-top:6px"><span>${esc(cl?cl.name:'بدون موكل')}</span><span class="tag ${c.status==='جارية'?'on':''}">${esc(c.status)}</span></div><div class="mut">متبقي: <b class="${d>0?'late':''}">${money(d)}</b></div><button class="btn g" style="margin-top:8px" onclick="openDocs('${c.id}')">المستندات (${S.docs.filter(x=>x.case===c.id).length})</button></div>`}).join(''):empty('لا توجد قضايا مطابقة.'))},
  clients(){
   return addBtn('clients')+(S.clients.length?S.clients.map(c=>`<div class="card"><div class="row"><b>${esc(c.name)}</b>${acts('clients',c.id)}</div>${c.phone?`<div class="row" style="justify-content:flex-start;gap:14px"><a href="tel:${esc(c.phone)}">اتصال</a><a href="https://wa.me/${wa(c.phone)}" target="_blank" rel="noopener">واتساب</a><a href="sms:${esc(c.phone)}">رسالة</a><span class="mut">${esc(c.phone)}</span></div>`:''}<div class="mut">${S.cases.filter(x=>x.client===c.id).length} قضايا</div>${c.note?`<div class="mut">${esc(c.note)}</div>`:''}</div>`).join(''):empty('أضف أول موكل لمكتبك.'))},
  hearings(){
@@ -158,6 +158,38 @@ function ics(list){
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([L.join('\r\n')],{type:'text/calendar'}));a.download='hearings.ics';
  document.body.appendChild(a);a.click();a.remove();
 }
+const idb=new Promise(r=>{try{const o=indexedDB.open('lawdocs',1);o.onupgradeneeded=()=>o.result.createObjectStore('f');o.onsuccess=()=>r(o.result);o.onerror=()=>r(null)}catch(e){r(null)}});
+const tx=async(m,f)=>{const db=await idb;if(!db)throw 0;return new Promise((res,rej)=>{const t=db.transaction('f',m),r=f(t.objectStore('f'));t.oncomplete=()=>res(r.result);t.onerror=()=>rej(t.error)})};
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+const fsize=n=>n>1048576?(n/1048576).toFixed(1)+' MB':Math.ceil(n/1024)+' KB';
+$('#dlg').addEventListener('close',()=>render());
+function openDocs(cid){
+ const c=byId('cases',cid),d=$('#dlg'),l=S.docs.filter(x=>x.case===cid);
+ d.innerHTML=`<h2 style="margin-top:0">مستندات: ${esc(c.title)}</h2>`+(l.length?l.map(x=>`<div class="card row"><span>${esc(x.name)}<div class="mut">${fsize(x.size)} · ${fdate(x.date)}</div></span><span><button class="ico" onclick="viewDoc('${x.id}')">فتح</button><button class="ico" onclick="delDoc('${cid}','${x.id}')" aria-label="حذف">✕</button></span></div>`).join(''):empty('لا توجد مستندات لهذه القضية.'))+`<div class="row" style="margin-top:12px;justify-content:flex-start"><button class="btn" onclick="pick('${cid}',0)">إضافة ملف</button><button class="btn g" onclick="pick('${cid}',1)">تصوير مستند</button></div><div style="margin-top:12px"><button class="btn g" onclick="$('#dlg').close()">إغلاق</button></div>`;
+ if(!d.open)d.showModal();
+}
+function pick(cid,cam){
+ const i=document.createElement('input');i.type='file';i.multiple=!cam;i.accept=cam?'image/*':'image/*,application/pdf,.doc,.docx,.xls,.xlsx';if(cam)i.capture='environment';
+ i.onchange=async()=>{
+  for(const f of i.files){
+   const id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+   try{await tx('readwrite',s=>s.put(f,id));S.docs.push({id,case:cid,name:f.name,size:f.size,date:todayS});save()}catch(e){alert('تعذر حفظ الملف: '+f.name)}
+  }
+  openDocs(cid);
+ };
+ i.click();
+}
+async function viewDoc(id){
+ try{
+  const b=await tx('readonly',s=>s.get(id));if(!b)throw 0;
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
+ }catch(e){alert('الملف غير موجود على هذا الجهاز.')}
+}
+async function delDoc(cid,id){
+ if(!confirm('حذف هذا المستند؟'))return;
+ try{await tx('readwrite',s=>s.delete(id))}catch(e){}
+ S.docs=S.docs.filter(x=>x.id!==id);save();openDocs(cid);
+}
 function exportData(){
  const b=new Blob([JSON.stringify(S)],{type:'application/json'});
  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='law-office-backup-'+todayS+'.json';
@@ -172,7 +204,7 @@ imp.onchange=()=>{
    const d=JSON.parse(r.result);
    if(!['clients','cases','hearings','pay'].every(k=>Array.isArray(d[k])))throw 0;
    if(!confirm('سيتم استبدال البيانات الحالية بالنسخة المحفوظة. متابعة؟'))return;
-   S={clients:d.clients,cases:d.cases,hearings:d.hearings,pay:d.pay};save();render();
+   S={clients:d.clients,cases:d.cases,hearings:d.hearings,pay:d.pay,docs:d.docs||[]};save();render();
   }catch(e){alert('الملف غير صالح. اختر ملف نسخة احتياطية تم حفظه من البرنامج.')}
   imp.value='';
  };
