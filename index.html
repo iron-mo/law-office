@@ -16,7 +16,7 @@ h1{font-family:Amiri,'Times New Roman',serif;font-size:28px;margin:0;color:var(-
 h2{font-size:18px;margin:20px 0 8px}
 main{padding:0 16px;max-width:720px;margin:auto}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
-.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .mut{color:var(--mut);font-size:14px}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .stat{border-radius:10px;padding:12px;background:var(--pri);color:var(--pri-ink)}
@@ -35,7 +35,8 @@ nav button.on{color:var(--pri);font-weight:700;box-shadow:inset 0 3px 0 var(--pr
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);width:min(92vw,420px);padding:16px}
 dialog::backdrop{background:rgba(0,0,0,.45)}
 label{display:block;margin-top:10px;font-size:14px;color:var(--mut)}
-input,select{width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+input,select,textarea{width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+textarea.x{width:100%;font:inherit;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
 :focus-visible{outline:2px solid var(--pri);outline-offset:2px}
 .empty{text-align:center;padding:28px 10px;color:var(--mut)}
 </style>
@@ -47,7 +48,7 @@ input,select{width:100%;font:inherit;padding:9px;border:1px solid var(--line);bo
 <dialog id="dlg"></dialog>
 <script>
 const KEY='lawoffice-v1';
-let S={clients:[],cases:[],hearings:[],pay:[],docs:[]},tab='home',q='';
+let S={clients:[],cases:[],hearings:[],pay:[],docs:[],exp:[],dl:[]},tab='home',q='';
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const $=s=>document.querySelector(s);
@@ -64,6 +65,8 @@ const F={
  hearings:{t:'جلسة',f:[['case','القضية','sel:cases'],['date','التاريخ','date'],['time','الوقت','time'],['note','ملاحظات / المطلوب']]},
  pay:{t:'دفعة',f:[['case','القضية','sel:cases'],['amount','المبلغ','number'],['date','التاريخ','date']]}
 };
+F.exp={t:'مصروف',f:[['case','القضية','sel:cases'],['amount','المبلغ','number'],['date','التاريخ','date'],['note','البيان (رسوم، انتقال، خبير...)']]};
+F.dl={t:'ميعاد',f:[['case','القضية','sel:cases'],['title','نوع الميعاد (استئناف، نقض...)'],['from','تاريخ البداية (مثلًا صدور الحكم)','date'],['days','عدد الأيام (اختياري)','number'],['date','آخر ميعاد (يُحسب تلقائيًا لو أدخلت الأيام)','date']]};
 const label=(k,x)=>k==='clients'?x.name:x.title+(x.no?' ('+x.no+')':'');
 function openForm(k,id){
  const cfg=F[k],x=id?byId(k,id):{date:todayS,status:'جارية'};
@@ -85,6 +88,8 @@ function openForm(k,id){
  $('#ok').onclick=()=>{
   const o=id?x:{id:Date.now().toString(36)};
   d.querySelectorAll('#f [name]').forEach(e=>o[e.name]=e.value.trim());
+  if(k==='dl'&&o.from&&o.days){const t=new Date(o.from+'T00:00');t.setDate(t.getDate()+Number(o.days));o.date=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')}
+  if(k==='dl'&&!o.date){alert('أدخل آخر ميعاد أو تاريخ البداية مع عدد الأيام');return}
   if(!id)S[k].push(o);
   save();d.close();render();
  };
@@ -92,15 +97,15 @@ function openForm(k,id){
 function del(k,id){
  if(!confirm('هل تريد الحذف نهائيًا؟'))return;
  S[k]=S[k].filter(x=>x.id!==id);
- if(k==='cases'){S.hearings=S.hearings.filter(h=>h.case!==id);S.pay=S.pay.filter(p=>p.case!==id);S.docs.filter(x=>x.case===id).forEach(x=>tx('readwrite',s=>s.delete(x.id)).catch(()=>{}));S.docs=S.docs.filter(x=>x.case!==id)}
+ if(k==='cases'){S.hearings=S.hearings.filter(h=>h.case!==id);S.pay=S.pay.filter(p=>p.case!==id);S.docs.filter(x=>x.case===id).forEach(x=>tx('readwrite',s=>s.delete(x.id)).catch(()=>{}));S.docs=S.docs.filter(x=>x.case!==id);S.exp=S.exp.filter(x=>x.case!==id);S.dl=S.dl.filter(x=>x.case!==id)}
  save();render();
 }
 const acts=(k,id)=>`<span><button class="ico" onclick="openForm('${k}','${id}')" aria-label="تعديل">✎</button><button class="ico" onclick="del('${k}','${id}')" aria-label="حذف">✕</button></span>`;
-const addBtn=k=>`<div class="row"><h2>${{clients:'الموكلون',cases:'القضايا',hearings:'الجلسات',pay:'الدفعات'}[k]}</h2><button class="btn" onclick="openForm('${k}')">+ ${F[k].t}</button></div>`;
+const addBtn=k=>`<div class="row"><h2>${{clients:'الموكلون',cases:'القضايا',hearings:'الجلسات',pay:'الدفعات',exp:'المصاريف',dl:'المواعيد القانونية'}[k]}</h2><button class="btn" onclick="openForm('${k}')">+ ${F[k].t}</button></div>`;
 const empty=t=>`<div class="empty">${t}</div>`;
 function hearingCard(h){
  const c=byId('cases',h.case),late=h.date<todayS,cl=c&&byId('clients',c.client);
- return `<div class="card"><div class="row"><b>${esc(c?c.title:'قضية محذوفة')}</b>${acts('hearings',h.id)}</div><div class="${late?'late':'mut'}">${fdate(h.date)} ${esc(h.time)}${late?' — فاتت':''}</div>${h.note?`<div class="mut">${esc(h.note)}</div>`:''}<button class="btn g" style="margin-top:8px" onclick="ics([byId('hearings','${h.id}')])">أضف للتقويم مع تذكير</button>${cl&&cl.phone?`<a class="btn g" style="margin-top:8px;margin-inline-start:6px;display:inline-block;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${wa(cl.phone)}?text=${encodeURIComponent('تذكير بجلسة قضية '+c.title+' يوم '+fdate(h.date)+' الساعة '+h.time)}">ذكّر الموكل</a>`:''}</div>`}
+ return `<div class="card"><div class="row"><b>${esc(c?c.title:'قضية محذوفة')}</b>${acts('hearings',h.id)}</div><div class="${late?'late':'mut'}">${fdate(h.date)} ${esc(h.time)}${late?' — فاتت':''}</div>${h.note?`<div class="mut">${esc(h.note)}</div>`:''}${h.result?`<div style="margin-top:4px">النتيجة: ${esc(h.result)}</div>`:''}<button class="btn g" style="margin-top:8px;margin-inline-end:6px" onclick="openResult('${h.id}')">${h.result?'تعديل النتيجة':'تسجيل النتيجة'}</button><button class="btn g" style="margin-top:8px" onclick="ics([byId('hearings','${h.id}')])">أضف للتقويم مع تذكير</button>${cl&&cl.phone?`<a class="btn g" style="margin-top:8px;margin-inline-start:6px;display:inline-block;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${wa(cl.phone)}?text=${encodeURIComponent('تذكير بجلسة قضية '+c.title+' يوم '+fdate(h.date)+' الساعة '+h.time)}">ذكّر الموكل</a>`:''}</div>`}
 const V={
  home(){
   const up=S.hearings.filter(h=>h.date>=todayS).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
@@ -110,12 +115,13 @@ const V={
   let h=`<div class="stats"><div class="stat"><b>${open}</b>قضايا مفتوحة</div><div class="stat"><b>${week}</b>جلسات خلال أسبوع</div><div class="stat w"><b>${S.clients.length}</b>موكلون</div><div class="stat w"><b>${money(owed)}</b>أتعاب متبقية</div></div><h2>الجلسات القادمة</h2>`;
   h+=up.length?up.slice(0,5).map(hearingCard).join(''):empty('لا توجد جلسات قادمة. أضف جلسة من تبويب «الجلسات».');
   if(!S.clients.length&&!S.cases.length)h+=`<div class="empty"><button class="btn g" onclick="seed()">تحميل بيانات تجريبية</button></div>`;
-  h+=`<h2>نسخة احتياطية</h2><div class="card"><div class="mut">احفظ كل بياناتك في ملف، واستعدها وقت الحاجة. (الملفات المرفقة نفسها لا تدخل في النسخة.)</div><div class="row" style="margin-top:10px;justify-content:flex-start"><button class="btn" onclick="exportData()">حفظ نسخة</button><button class="btn g" onclick="$('#imp').click()">استعادة نسخة</button></div></div>`;
+  h+=`<h2>نسخة احتياطية</h2><div class="card"><div class="mut">احفظ كل بياناتك في ملف، واستعدها وقت الحاجة. (زر «نسخة بالمستندات» يضم الملفات المرفقة، وحجمه أكبر.)</div><div class="row" style="margin-top:10px;justify-content:flex-start"><button class="btn" onclick="exportData()">حفظ نسخة</button><button class="btn g" onclick="exportData(true)">نسخة بالمستندات</button><button class="btn g" onclick="$('#imp').click()">استعادة نسخة</button></div></div>`;
+  h+=secCard();
   return h},
  cases(){
   const l=S.cases.filter(c=>(c.title+c.no+c.court+((byId('clients',c.client)||{}).name||'')).includes(q));
   return addBtn('cases')+`<input placeholder="بحث بالعنوان أو الرقم أو الموكل" value="${esc(q)}" oninput="q=this.value;render(true)" style="margin-bottom:10px">`+
-  (l.length?l.map(c=>{const cl=byId('clients',c.client),d=due(c);return `<div class="card"><div class="row"><b>${esc(c.title)}</b>${acts('cases',c.id)}</div><div class="mut">${esc(c.no)} · ${esc(c.court)}</div><div class="row" style="margin-top:6px"><span>${esc(cl?cl.name:'بدون موكل')}</span><span class="tag ${c.status==='جارية'?'on':''}">${esc(c.status)}</span></div><div class="mut">متبقي: <b class="${d>0?'late':''}">${money(d)}</b></div><button class="btn g" style="margin-top:8px" onclick="openDocs('${c.id}')">المستندات (${S.docs.filter(x=>x.case===c.id).length})</button></div>`}).join(''):empty('لا توجد قضايا مطابقة.'))},
+  (l.length?l.map(c=>{const cl=byId('clients',c.client),d=due(c);return `<div class="card"><div class="row"><b>${esc(c.title)}</b>${acts('cases',c.id)}</div><div class="mut">${esc(c.no)} · ${esc(c.court)}</div><div class="row" style="margin-top:6px"><span>${esc(cl?cl.name:'بدون موكل')}</span><span class="tag ${c.status==='جارية'?'on':''}">${esc(c.status)}</span></div><div class="mut">متبقي: <b class="${d>0?'late':''}">${money(d)}</b></div><button class="btn g" style="margin-top:8px;margin-inline-end:6px" onclick="openHist('${c.id}')">سجل الجلسات</button><button class="btn g" style="margin-top:8px" onclick="openDocs('${c.id}')">المستندات (${S.docs.filter(x=>x.case===c.id).length})</button></div>`}).join(''):empty('لا توجد قضايا مطابقة.'))},
  clients(){
   return addBtn('clients')+(S.clients.length?S.clients.map(c=>`<div class="card"><div class="row"><b>${esc(c.name)}</b>${acts('clients',c.id)}</div>${c.phone?`<div class="row" style="justify-content:flex-start;gap:14px"><a href="tel:${esc(c.phone)}">اتصال</a><a href="https://wa.me/${wa(c.phone)}" target="_blank" rel="noopener">واتساب</a><a href="sms:${esc(c.phone)}">رسالة</a><span class="mut">${esc(c.phone)}</span></div>`:''}<div class="mut">${S.cases.filter(x=>x.client===c.id).length} قضايا</div>${c.note?`<div class="mut">${esc(c.note)}</div>`:''}</div>`).join(''):empty('أضف أول موكل لمكتبك.'))},
  hearings(){
@@ -131,7 +137,7 @@ function render(keep){
  $('#today').textContent=new Date().toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
  $('#nav').innerHTML=T.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';q='';render()">${l}</button>`).join('');
  const f=document.activeElement;
- $('#app').innerHTML=V[tab]();
+ $('#app').innerHTML=(tab==='home'?notices():'')+V[tab]();
  if(keep&&f&&f.tagName==='INPUT'){const i=$('#app input');if(i){i.focus();i.setSelectionRange(q.length,q.length)}}
 }
 function seed(){
@@ -151,8 +157,8 @@ function ics(list){
  list.forEach(h=>{
   const c=byId('cases',h.case),[y,m,d]=h.date.split('-'),[hh,mm]=(h.time||'09:00').split(':').map(Number);
   const e=new Date(+y,+m-1,+d,hh+1,mm),f=x=>`${x.getFullYear()}${p(x.getMonth()+1)}${p(x.getDate())}T${p(x.getHours())}${p(x.getMinutes())}00`;
-  L.push('BEGIN:VEVENT','UID:'+h.id+'@lawoffice','DTSTAMP:'+stamp,'DTSTART:'+f(new Date(+y,+m-1,+d,hh,mm)),'DTEND:'+f(e),'SUMMARY:'+cl('جلسة: '+(c?c.title:'')),'DESCRIPTION:'+cl((c&&c.no?c.no+' ':'')+(c&&c.court?c.court+' ':'')+(h.note||'')),
-   'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:جلسة غدًا','TRIGGER:-P1D','END:VALARM','BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:جلسة خلال ساعة','TRIGGER:-PT1H','END:VALARM','END:VEVENT');
+  L.push('BEGIN:VEVENT','UID:'+h.id+'@lawoffice','DTSTAMP:'+stamp,'DTSTART:'+f(new Date(+y,+m-1,+d,hh,mm)),'DTEND:'+f(e),'SUMMARY:'+cl((h.dl?'ميعاد: '+(h.note||'')+' - ':'جلسة: ')+(c?c.title:'')),'DESCRIPTION:'+cl((c&&c.no?c.no+' ':'')+(c&&c.court?c.court+' ':'')+(h.note||'')),
+   'BEGIN:VALARM','ACTION:DISPLAY',(h.dl?'DESCRIPTION:ميعاد قانوني قريب':'DESCRIPTION:جلسة غدًا'),(h.dl?'TRIGGER:-P3D':'TRIGGER:-P1D'),'END:VALARM','BEGIN:VALARM','ACTION:DISPLAY',(h.dl?'DESCRIPTION:ميعاد قانوني قريب':'DESCRIPTION:جلسة خلال ساعة'),(h.dl?'TRIGGER:-P1D':'TRIGGER:-PT1H'),'END:VALARM','END:VEVENT');
  });
  L.push('END:VCALENDAR');
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([L.join('\r\n')],{type:'text/calendar'}));a.download='hearings.ics';
@@ -190,8 +196,78 @@ async function delDoc(cid,id){
  try{await tx('readwrite',s=>s.delete(id))}catch(e){}
  S.docs=S.docs.filter(x=>x.id!==id);save();openDocs(cid);
 }
-function exportData(){
- const b=new Blob([JSON.stringify(S)],{type:'application/json'});
+const PK='lawoffice-pin';
+const pinGet=()=>{try{return localStorage.getItem(PK)}catch(e){return null}};
+const hp=async p=>{try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('lo:'+p));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){let h=0;for(const c of 'lo:'+p)h=(h*31+c.charCodeAt(0))|0;return 'f'+h}};
+const u8=s=>{const [h,b]=s.split(','),bin=atob(b),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return new Blob([a],{type:h.match(/:(.*?);/)[1]})};
+function lockUI(){
+ let L=$('#lock');
+ if(!L){L=document.createElement('div');L.id='lock';L.style.cssText='position:fixed;inset:0;z-index:99;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px';document.body.appendChild(L)}
+ L.innerHTML='<h1>مكتب المحاماة</h1><div class="mut">اكتب كلمة السر</div><input id="pin" type="password" inputmode="numeric" autocomplete="off" style="max-width:220px;text-align:center;font-size:22px"><button class="btn" id="pgo">دخول</button><div class="late" id="perr"></div>';
+ L.style.display='flex';
+ const go=async()=>{if(await hp($('#pin').value)===pinGet())L.style.display='none';else{$('#perr').textContent='كلمة السر غير صحيحة';$('#pin').value=''}};
+ $('#pgo').onclick=go;$('#pin').onkeydown=e=>{if(e.key==='Enter')go()};$('#pin').focus();
+}
+if(pinGet())lockUI();
+let hid=0;
+document.addEventListener('visibilitychange',()=>{if(document.hidden)hid=Date.now();else if(pinGet()&&hid&&Date.now()-hid>30000)lockUI()});
+async function setPin(){
+ const cur=pinGet();
+ if(cur&&await hp(prompt('كلمة السر الحالية')||'')!==cur){alert('كلمة السر الحالية غير صحيحة');return}
+ const n=prompt('اكتب كلمة سر جديدة (4 أرقام على الأقل). اتركها فارغة لإلغاء القفل.');
+ if(n===null)return;
+ if(n===''){try{localStorage.removeItem(PK)}catch(e){}alert('تم إلغاء القفل');render();return}
+ if(n.length<4){alert('كلمة السر قصيرة');return}
+ try{localStorage.setItem(PK,await hp(n))}catch(e){}
+ alert('تم تعيين كلمة السر');render();
+}
+function secCard(){
+ return `<h2>الأمان</h2><div class="card"><div class="mut">${pinGet()?'القفل مفعّل.':'القفل غير مفعّل.'} القفل يمنع فتح البرنامج على تليفونك، لكنه لا يشفّر البيانات. لو نسيت كلمة السر لن تقدر على فتح البرنامج إلا بمسح بيانات التطبيق، وتفقد بياناتك إن لم تكن معك نسخة احتياطية.</div><div class="row" style="margin-top:10px;justify-content:flex-start"><button class="btn" onclick="setPin()">${pinGet()?'تغيير أو إلغاء كلمة السر':'تعيين كلمة سر'}</button></div></div>`;
+}
+function notices(){
+ let o='';
+ const nr=S.hearings.filter(h=>h.date<todayS&&!h.result).length;
+ if(nr)o+=`<div class="card" style="border-color:var(--acc)"><b class="late">${nr} جلسة فاتت بدون تسجيل نتيجة</b><div class="mut">سجّل النتيجة من تبويب «الجلسات».</div></div>`;
+ let lb=0;try{lb=+localStorage.getItem('lawoffice-lastbk')||0}catch(e){}
+ const days=lb?Math.floor((Date.now()-lb)/864e5):0;
+ if((S.cases.length||S.clients.length)&&(!lb||days>=7))o+=`<div class="card" style="border-color:var(--acc)"><b class="late">${lb?'مرّ '+days+' يوم على آخر نسخة احتياطية':'لم تحفظ نسخة احتياطية بعد'}</b><div class="row" style="margin-top:8px;justify-content:flex-start"><button class="btn" onclick="exportData()">حفظ نسخة الآن</button></div></div>`;
+ return o;
+}
+function openResult(id){
+ const h=byId('hearings',id),d=$('#dlg');
+ d.innerHTML=`<h2 style="margin-top:0">نتيجة الجلسة</h2><label>ما حدث / القرار<textarea id="rs" rows="3">${esc(h.result)}</textarea></label><label>الجلسة القادمة (اختياري)<input id="nd" type="date"></label><label>الوقت<input id="nt" type="time" value="${esc(h.time)}"></label><div class="row" style="margin-top:16px"><button class="btn" id="rok">حفظ</button><button class="btn g" onclick="$('#dlg').close()">إلغاء</button></div>`;
+ d.showModal();
+ $('#rok').onclick=()=>{h.result=$('#rs').value.trim();const nd=$('#nd').value;if(nd)S.hearings.push({id:Date.now().toString(36),case:h.case,date:nd,time:$('#nt').value,note:''});save();d.close()};
+}
+function openHist(cid){
+ const c=byId('cases',cid),d=$('#dlg'),l=S.hearings.filter(h=>h.case===cid).sort((a,b)=>b.date.localeCompare(a.date));
+ d.innerHTML=`<h2 style="margin-top:0">سجل: ${esc(c.title)}</h2>`+(l.length?l.map(h=>`<div class="card"><b>${fdate(h.date)} ${esc(h.time)}</b>${h.note?`<div class="mut">${esc(h.note)}</div>`:''}<div>${h.result?esc(h.result):(h.date<todayS?'<span class="late">لم تُسجل النتيجة</span>':'<span class="mut">جلسة قادمة</span>')}</div></div>`).join(''):empty('لا توجد جلسات لهذه القضية.'))+`<button class="btn g" onclick="$('#dlg').close()">إغلاق</button>`;
+ d.showModal();
+}
+function dlSection(){
+ const l=[...S.dl].sort((a,b)=>(!!a.done-!!b.done)||a.date.localeCompare(b.date));
+ return addBtn('dl')+`<div class="mut" style="margin-bottom:8px">احسب الميعاد من تاريخ البداية وعدد الأيام. تأكد دائمًا من الميعاد القانوني الصحيح (العطلات وقواعد الاحتساب لا تُحسب تلقائيًا).</div>`+(l.length?l.map(x=>{const c=byId('cases',x.case),n=Math.round((new Date(x.date+'T00:00')-new Date(todayS+'T00:00'))/864e5);return `<div class="card"><div class="row"><b>${esc(x.title)}${x.done?' ✓':''}</b>${acts('dl',x.id)}</div><div class="mut">${esc(c?c.title:'')}</div><div class="${!x.done&&n<=3?'late':'mut'}">${fdate(x.date)} — ${x.done?'تم':n<0?'فات منذ '+(-n)+' يوم':n===0?'اليوم':'بعد '+n+' يوم'}</div><button class="btn g" style="margin-top:8px;margin-inline-end:6px" onclick="togDl('${x.id}')">${x.done?'إلغاء «تم»':'تم'}</button><button class="btn g" style="margin-top:8px" onclick="icsDl('${x.id}')">أضف للتقويم مع تذكير</button></div>`}).join(''):empty('لا توجد مواعيد قانونية.'));
+}
+function togDl(id){const x=byId('dl',id);x.done=!x.done;save();render()}
+function icsDl(id){const x=byId('dl',id);ics([{id:x.id,case:x.case,date:x.date,time:'09:00',note:x.title,dl:1}])}
+function dlAlert(){
+ const u=S.dl.filter(x=>!x.done&&x.date&&(new Date(x.date+'T00:00')-new Date(todayS+'T00:00'))/864e5<=7).sort((a,b)=>a.date.localeCompare(b.date));
+ return u.length?`<div class="card" style="border-color:var(--acc)"><b class="late">مواعيد قانونية قريبة</b>${u.map(x=>`<div>${esc(x.title)} — ${fdate(x.date)}</div>`).join('')}</div>`:'';
+}
+function expSection(){
+ const l=[...S.exp].sort((a,b)=>b.date.localeCompare(a.date)),sum=a=>a.reduce((t,x)=>t+Number(x.amount||0),0);
+ const nets=S.cases.filter(c=>S.exp.some(x=>x.case===c.id)).map(c=>{const e=sum(S.exp.filter(x=>x.case===c.id));return `<div class="card row"><span>${esc(c.title)}<div class="mut">مدفوع ${money(paid(c.id))} − مصاريف ${money(e)}</div></span><b>${money(paid(c.id)-e)}</b></div>`}).join('');
+ return addBtn('exp')+(l.length?`<div class="mut" style="margin-bottom:8px">إجمالي المصاريف: ${money(sum(l))}</div>`+l.map(x=>{const c=byId('cases',x.case);return `<div class="card row"><span>${esc(x.note||'مصروف')}<div class="mut">${esc(c?c.title:'—')} · ${fdate(x.date)}</div></span><span><b>${money(x.amount)}</b>${acts('exp',x.id)}</span></div>`}).join('')+`<h2>صافي المدفوع بعد المصاريف</h2>`+nets:empty('لا توجد مصاريف مسجلة.'));
+}
+const _hr=V.hearings,_fe=V.fees,_nt=notices;
+V.hearings=()=>_hr()+dlSection();
+V.fees=()=>_fe()+expSection();
+notices=()=>_nt()+dlAlert();
+async function exportData(full){
+ const out={...S};
+ if(full&&S.docs.length){out.files={};for(const x of S.docs){try{const b=await tx('readonly',s=>s.get(x.id));if(b)out.files[x.id]=await new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)})}catch(e){}}}
+ try{localStorage.setItem('lawoffice-lastbk',Date.now())}catch(e){}
+ const b=new Blob([JSON.stringify(out)],{type:'application/json'});
  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='law-office-backup-'+todayS+'.json';
  document.body.appendChild(a);a.click();a.remove();
 }
@@ -199,12 +275,12 @@ const imp=document.createElement('input');imp.type='file';imp.accept='.json,appl
 imp.onchange=()=>{
  const f=imp.files[0];if(!f)return;
  const r=new FileReader();
- r.onload=()=>{
+ r.onload=async()=>{
   try{
    const d=JSON.parse(r.result);
    if(!['clients','cases','hearings','pay'].every(k=>Array.isArray(d[k])))throw 0;
    if(!confirm('سيتم استبدال البيانات الحالية بالنسخة المحفوظة. متابعة؟'))return;
-   S={clients:d.clients,cases:d.cases,hearings:d.hearings,pay:d.pay,docs:d.docs||[]};save();render();
+   S={clients:d.clients,cases:d.cases,hearings:d.hearings,pay:d.pay,docs:d.docs||[],exp:d.exp||[],dl:d.dl||[]};save();if(d.files)for(const id in d.files){try{await tx('readwrite',s=>s.put(u8(d.files[id]),id))}catch(e){}}render();
   }catch(e){alert('الملف غير صالح. اختر ملف نسخة احتياطية تم حفظه من البرنامج.')}
   imp.value='';
  };
