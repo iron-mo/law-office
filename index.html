@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1d4e5a"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><title>إدارة مكتب المحاماة</title>
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1d4e5a"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><title>مكتب الوهدان للمحاماة</title>
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f3f5f4;--card:#fff;--ink:#17262b;--mut:#5d6f73;--line:#d9e0e0;--pri:#1d4e5a;--pri-ink:#fff;--acc:#a8402f;--ok:#2f7d5b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -42,7 +42,7 @@ textarea.x{width:100%;font:inherit;padding:9px;border:1px solid var(--line);bord
 </style>
 </head>
 <body>
-<header><h1>مكتب المحاماة</h1><div class="mut" id="today"></div></header>
+<header><h1>مكتب الوهدان للمحاماة</h1><div class="mut" id="today"></div></header>
 <main id="app"></main>
 <nav id="nav"></nav>
 <dialog id="dlg"></dialog>
@@ -203,7 +203,7 @@ const u8=s=>{const [h,b]=s.split(','),bin=atob(b),a=new Uint8Array(bin.length);f
 function lockUI(){
  let L=$('#lock');
  if(!L){L=document.createElement('div');L.id='lock';L.style.cssText='position:fixed;inset:0;z-index:99;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px';document.body.appendChild(L)}
- L.innerHTML='<h1>مكتب المحاماة</h1><div class="mut">اكتب كلمة السر</div><input id="pin" type="password" inputmode="numeric" autocomplete="off" style="max-width:220px;text-align:center;font-size:22px"><button class="btn" id="pgo">دخول</button><div class="late" id="perr"></div>';
+ L.innerHTML='<h1>مكتب الوهدان للمحاماة</h1><div class="mut">اكتب كلمة السر</div><input id="pin" type="password" inputmode="numeric" autocomplete="off" style="max-width:220px;text-align:center;font-size:22px"><button class="btn" id="pgo">دخول</button><div class="late" id="perr"></div>';
  L.style.display='flex';
  const go=async()=>{if(await hp($('#pin').value)===pinGet())L.style.display='none';else{$('#perr').textContent='كلمة السر غير صحيحة';$('#pin').value=''}};
  $('#pgo').onclick=go;$('#pin').onkeydown=e=>{if(e.key==='Enter')go()};$('#pin').focus();
