@@ -503,16 +503,16 @@ async function exportData(full,share){
  const nm='law-office-backup-'+todayS+(full?'-full':'')+'.json';
  if(share){
   try{
-   const fl=new File([b],nm,{type:'application/json'});
+   const fl=new File([b],nm.replace('.json','.txt'),{type:'text/plain'});
    if(navigator.canShare&&navigator.canShare({files:[fl]})){await navigator.share({files:[fl],title:'نسخة مكتب الوهدان للمحاماة'});try{localStorage.setItem('lawoffice-lastbk',Date.now())}catch(e){}render();return}
    alert('جهازك لا يدعم المشاركة المباشرة، سيتم حفظ الملف بدلًا منها.');
-  }catch(e){if(e&&e.name==='AbortError')return;alert('تعذّرت المشاركة المباشرة، سيتم حفظ الملف في التنزيلات ويمكنك مشاركته من هناك.')}
+  }catch(e){if(e&&e.name==='AbortError')return;alert('['+(e&&e.name)+'] '+'تعذّرت المشاركة المباشرة، سيتم حفظ الملف في التنزيلات ويمكنك مشاركته من هناك.')}
   try{localStorage.setItem('lawoffice-lastbk',Date.now())}catch(e){}
  }
  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=nm;
  document.body.appendChild(a);a.click();a.remove();
 }
-const imp=document.createElement('input');imp.type='file';imp.accept='.json,application/json';imp.id='imp';imp.hidden=true;document.body.appendChild(imp);
+const imp=document.createElement('input');imp.type='file';imp.accept='.json,.txt,application/json,text/plain';imp.id='imp';imp.hidden=true;document.body.appendChild(imp);
 imp.onchange=()=>{
  const f=imp.files[0];if(!f)return;
  const r=new FileReader();
