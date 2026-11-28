@@ -230,7 +230,7 @@ function notices(){
  if(nr)o+=`<div class="card" style="border-color:var(--acc)"><b class="late">${nr} جلسة فاتت بدون تسجيل نتيجة</b><div class="mut">سجّل النتيجة من تبويب «الجلسات».</div></div>`;
  let lb=0;try{lb=+localStorage.getItem('lawoffice-lastbk')||0}catch(e){}
  const days=lb?Math.floor((Date.now()-lb)/864e5):0;
- if((S.cases.length||S.clients.length)&&(!lb||days>=7))o+=`<div class="card" style="border-color:var(--acc)"><b class="late">${lb?'مرّ '+days+' يوم على آخر نسخة احتياطية':'لم تحفظ نسخة احتياطية بعد'}</b><div class="row" style="margin-top:8px;justify-content:flex-start"><button class="btn" onclick="exportData()">حفظ نسخة الآن</button></div></div>`;
+ if((S.cases.length||S.clients.length)&&(!lb||days>=7))o+=`<div class="card" style="border-color:var(--acc)"><b class="late">${lb?'مرّ '+days+' يوم على آخر نسخة احتياطية':'لم تحفظ نسخة احتياطية بعد'}</b><div class="row" style="margin-top:8px;justify-content:flex-start"><button class="btn" onclick="exportData(false,true)">مشاركة نسخة الآن</button></div></div>`;
  return o;
 }
 function openResult(id){
@@ -458,7 +458,7 @@ V.cases=()=>{
  const f=q.trim().toLowerCase(),l=S.cases.filter(c=>[c.title,c.no,c.court,cname(c.client)].join(' ').toLowerCase().includes(f));
  return addBtn('cases')+`<input placeholder="بحث بالعنوان أو الرقم أو الموكل" value="${esc(q)}" oninput="q=this.value;render(true)" style="margin-bottom:10px">`+(l.length?l.map(caseCard).join(''):empty('لا توجد قضايا.'));
 };
-const bkCard=()=>`<h2>نسخة احتياطية</h2><div class="card"><div class="mut">احفظ كل بياناتك في ملف، واستعدها وقت الحاجة. (زر «نسخة بالمستندات» يضم الملفات المرفقة، وحجمه أكبر.)</div><div class="row" style="margin-top:10px;justify-content:flex-start"><button class="btn" onclick="exportData()">حفظ نسخة</button><button class="btn g" onclick="exportData(true)">نسخة بالمستندات</button><button class="btn g" onclick="$('#imp').click()">استعادة نسخة</button></div></div>`;
+const bkCard=()=>`<h2>نسخة احتياطية</h2><div class="card"><div class="mut">احفظ كل بياناتك في ملف، واستعدها وقت الحاجة. (زر «نسخة بالمستندات» يضم الملفات المرفقة، وحجمه أكبر.)</div><div class="row" style="margin-top:10px;justify-content:flex-start"><button class="btn" onclick="exportData()">حفظ نسخة</button><button class="btn g" onclick="exportData(true)">نسخة بالمستندات</button><button class="btn g" onclick="$('#imp').click()">استعادة نسخة</button><button class="btn" onclick="exportData(false,true)">📤 مشاركة نسخة</button><button class="btn g" onclick="exportData(true,true)">📤 مشاركة بالمستندات</button></div></div>`;
 V.more=()=>{
  const it=[['🗓️','الجلسات والمواعيد القانونية','hearings'],['💰','الأتعاب والمصاريف','fees'],['🔨','تنفيذ الأحكام','ex'],['🗂️','الأحكام والتوكيلات','lib']];
  return '<h2>المزيد</h2>'+it.map(([i,t,k])=>`<div class="item" onclick="go('${k}')"><span>${i}  ${t}</span><span class="mut">‹</span></div>`).join('')+bkCard()+secCard()+syCard();
@@ -495,12 +495,21 @@ render=function(keep){
  if(keep&&fa&&fa.tagName==='INPUT'){const i=$('#app input');if(i){i.focus();i.setSelectionRange(q.length,q.length)}}
  loadThumbs();
 };
-async function exportData(full){
+async function exportData(full,share){
  const out={...S};
  if(full&&S.docs.length){out.files={};for(const x of S.docs){try{const b=await tx('readonly',s=>s.get(x.id));if(b)out.files[x.id]=await new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)})}catch(e){}}}
- try{localStorage.setItem('lawoffice-lastbk',Date.now())}catch(e){}
+ if(!share){try{localStorage.setItem('lawoffice-lastbk',Date.now())}catch(e){}}
  const b=new Blob([JSON.stringify(out)],{type:'application/json'});
- const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='law-office-backup-'+todayS+'.json';
+ const nm='law-office-backup-'+todayS+(full?'-full':'')+'.json';
+ if(share){
+  try{
+   const fl=new File([b],nm,{type:'application/json'});
+   if(navigator.canShare&&navigator.canShare({files:[fl]})){await navigator.share({files:[fl],title:'نسخة مكتب الوهدان للمحاماة'});try{localStorage.setItem('lawoffice-lastbk',Date.now())}catch(e){}render();return}
+   alert('جهازك لا يدعم المشاركة المباشرة، سيتم حفظ الملف بدلًا منها.');
+  }catch(e){if(e&&e.name==='AbortError')return;alert('تعذّرت المشاركة المباشرة، سيتم حفظ الملف في التنزيلات ويمكنك مشاركته من هناك.')}
+  try{localStorage.setItem('lawoffice-lastbk',Date.now())}catch(e){}
+ }
+ const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=nm;
  document.body.appendChild(a);a.click();a.remove();
 }
 const imp=document.createElement('input');imp.type='file';imp.accept='.json,application/json';imp.id='imp';imp.hidden=true;document.body.appendChild(imp);
