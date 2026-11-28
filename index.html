@@ -69,7 +69,7 @@ F.exp={t:'مصروف',f:[['case','القضية','sel:cases'],['amount','المب
 F.dl={t:'ميعاد',f:[['case','القضية','sel:cases'],['title','نوع الميعاد (استئناف، نقض...)'],['from','تاريخ البداية (مثلًا صدور الحكم)','date'],['days','عدد الأيام (اختياري)','number'],['date','آخر ميعاد (يُحسب تلقائيًا لو أدخلت الأيام)','date']]};
 const label=(k,x)=>k==='clients'?x.name:x.title+(x.no?' ('+x.no+')':'');
 function openForm(k,id){
- const cfg=F[k],x=id?byId(k,id):{date:todayS,status:'جارية'};
+ const cfg=F[k],x=id?byId(k,id):{...(window.PRE||{}),date:todayS,status:'جارية'};
  const fields=cfg.f.map(([n,l,t])=>{
   let inp;
   if(t&&t.startsWith('sel:')){const s=t.slice(4);inp=`<select name="${n}"><option value="">— اختر —</option>${S[s].map(o=>`<option value="${o.id}" ${x[n]===o.id?'selected':''}>${esc(label(s,o))}</option>`).join('')}</select>`}
@@ -422,6 +422,79 @@ async function delLib(id){
 function loadThumbs(){document.querySelectorAll('img[data-doc]').forEach(async im=>{try{const b=await tx('readonly',s=>s.get(im.dataset.doc));if(b)im.src=URL.createObjectURL(b)}catch(e){}})}
 const _r0=render;
 render=function(k){_r0(k);loadThumbs()};
+let cid=null,cit='h',ret='home',gq='';
+const SUB=['hearings','fees','ex','lib'];
+{const st=document.createElement('style');st.textContent=`body{font-size:17px;padding-bottom:150px}.chips{display:flex;gap:8px;overflow-x:auto;padding:6px 0}.chip{flex:0 0 auto;background:var(--pri);color:var(--pri-ink);border-radius:12px;padding:10px 14px;min-width:104px}.chip b{display:block;font-size:22px;line-height:1.3}.pills{display:flex;gap:8px;overflow-x:auto;margin:12px 0}.pill{flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:8px 16px;font:inherit;font-size:15px}.pill.on{background:var(--pri);color:var(--pri-ink);border-color:var(--pri)}.tap{cursor:pointer}.tap:active{background:var(--bg)}.back{background:none;border:0;color:var(--pri);font-size:18px;padding:4px 0;margin-bottom:6px}.sb{display:flex;align-items:center;gap:8px;background:var(--card);border:2px solid var(--pri);border-radius:14px;padding:2px 14px;margin:10px 0}.sb input{border:0;margin:0;font-size:19px;padding:12px 0;background:transparent}.sb input:focus{outline:none}.sub{padding:9px 0;border-top:1px solid var(--line)}.item{display:flex;justify-content:space-between;align-items:center;padding:16px 4px;border-bottom:1px solid var(--line);cursor:pointer}nav button{flex:1 1 0;padding:8px 2px 10px;font-size:13px}nav button span{display:block;font-size:22px;line-height:1.3}#fab{position:fixed;z-index:4;inset-inline-end:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));width:58px;height:58px;border-radius:50%;border:0;background:var(--acc);color:#fff;font-size:32px;box-shadow:0 4px 14px rgba(0,0,0,.3)}#sheet{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;z-index:5}#sheet .in{background:var(--card);width:100%;border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom,0px))}#sheet .in button{display:block;width:100%;text-align:start;background:none;border:0;border-bottom:1px solid var(--line);padding:16px 4px;color:var(--ink);font-size:18px}`;document.head.appendChild(st);
+ const f=document.createElement('button');f.id='fab';f.textContent='+';f.setAttribute('aria-label','إضافة سريعة');document.body.appendChild(f);
+ const sh=document.createElement('div');sh.id='sheet';sh.innerHTML='<div class="in" id="sin"></div>';document.body.appendChild(sh);
+ f.onclick=()=>{const L=[['⚖️  جلسة','hearings'],['💰  دفعة','pay'],['🧾  مصروف','exp'],['📌  ميعاد قانوني','dl'],['🔨  ملف تنفيذ','ex'],['👤  موكل','clients'],['📁  قضية','cases']];$('#sin').innerHTML='<b>إضافة سريعة'+(cid?' لهذه القضية':'')+'</b>'+L.map(([t,k])=>`<button onclick="$('#sheet').style.display='none';addFor('${k}')">${t}</button>`).join('');sh.style.display='flex'};
+ sh.onclick=e=>{if(e.target===sh)sh.style.display='none'};
+}
+function go(k){tab=k;cid=null;q='';render();scrollTo(0,0)}
+function openCase(id){ret=tab;cid=id;cit='h';render();scrollTo(0,0)}
+function addFor(k){window.PRE=cid?{case:cid}:null;openForm(k);window.PRE=null}
+function gs(){gq=$('#gq').value;$('#gres').innerHTML=gres();loadThumbs()}
+const cname=id=>(byId('clients',id)||{}).name||'';
+function caseCard(c){
+ const nx=S.hearings.filter(h=>h.case===c.id&&h.date>=todayS).sort((a,b)=>a.date.localeCompare(b.date))[0];
+ return `<div class="card tap" onclick="openCase('${c.id}')"><div class="row"><b>${esc(c.title)}</b><span class="tag ${c.status==='جارية'?'on':''}">${esc(c.status)}</span></div><div class="mut">${esc(cname(c.client))} · ${esc(c.no)} · ${esc(c.court)}</div><div class="mut">${nx?'الجلسة القادمة: '+fdate(nx.date)+' '+esc(nx.time):'لا توجد جلسة قادمة'}</div><div class="mut">متبقي: <b class="${due(c)>0?'late':''}">${money(due(c))}</b> · مستندات: ${S.docs.filter(x=>x.case===c.id).length}</div></div>`;
+}
+function homeDefault(){
+ const up=S.hearings.filter(h=>h.date>=todayS).sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+ const open=S.cases.filter(c=>c.status!=='مغلقة').length,owed=S.cases.reduce((a,c)=>a+Math.max(0,due(c)),0),week=up.filter(h=>(new Date(h.date)-new Date(todayS))/864e5<=7).length;
+ return notices()+`<div class="chips"><div class="chip"><b>${open}</b>قضايا مفتوحة</div><div class="chip"><b>${week}</b>جلسات الأسبوع</div><div class="chip"><b>${S.clients.length}</b>موكلون</div><div class="chip"><b>${money(owed)}</b>أتعاب متبقية</div></div><h2>الجلسات القادمة</h2>`+(up.length?up.slice(0,6).map(hearingCard).join(''):empty('لا توجد جلسات قادمة. أضف جلسة من زر +.'))+(!S.clients.length&&!S.cases.length?`<div class="empty"><button class="btn g" onclick="seed()">تحميل بيانات تجريبية</button></div>`:'');
+}
+function gres(){
+ const f=gq.trim().toLowerCase();
+ if(!f)return homeDefault();
+ const mc=S.clients.filter(k=>((k.name||'')+(k.phone||'')).toLowerCase().includes(f)),mcs=S.cases.filter(c=>[c.title,c.no,c.court,cname(c.client)].join(' ').toLowerCase().includes(f));
+ let o='';
+ if(mc.length)o+='<h2>موكلون</h2>'+mc.map(k=>{const l=S.cases.filter(c=>c.client===k.id),rem=l.reduce((a,c)=>a+Math.max(0,due(c)),0);return `<div class="card"><div class="row"><b>${esc(k.name)}</b><span class="mut">${l.length} قضايا</span></div><div class="mut">متبقي من الأتعاب: <b class="${rem>0?'late':''}">${money(rem)}</b></div>${l.map(c=>`<div class="sub tap" onclick="openCase('${c.id}')">⚖️ ${esc(c.title)} <span class="mut">· ${esc(c.no)}</span></div>`).join('')}${k.phone?`<div class="row" style="justify-content:flex-start;gap:8px;margin-top:8px"><a class="btn g" style="text-decoration:none" href="tel:${esc(k.phone)}">اتصال</a><a class="btn g" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${wa(k.phone)}">واتساب</a></div>`:''}</div>`}).join('');
+ if(mcs.length)o+='<h2>قضايا</h2>'+mcs.map(caseCard).join('');
+ return o||empty('لا توجد نتائج لـ «'+esc(gq)+'»');
+}
+function homeView(){return `<div class="sb"><span>🔍</span><input id="gq" placeholder="ابحث باسم الموكل أو رقم القضية أو المحكمة" oninput="gs()" value="${esc(gq)}" autocomplete="off"></div><div id="gres">${gres()}</div>`}
+V.cases=()=>{
+ const f=q.trim().toLowerCase(),l=S.cases.filter(c=>[c.title,c.no,c.court,cname(c.client)].join(' ').toLowerCase().includes(f));
+ return addBtn('cases')+`<input placeholder="بحث بالعنوان أو الرقم أو الموكل" value="${esc(q)}" oninput="q=this.value;render(true)" style="margin-bottom:10px">`+(l.length?l.map(caseCard).join(''):empty('لا توجد قضايا.'));
+};
+const bkCard=()=>`<h2>نسخة احتياطية</h2><div class="card"><div class="mut">احفظ كل بياناتك في ملف، واستعدها وقت الحاجة. (زر «نسخة بالمستندات» يضم الملفات المرفقة، وحجمه أكبر.)</div><div class="row" style="margin-top:10px;justify-content:flex-start"><button class="btn" onclick="exportData()">حفظ نسخة</button><button class="btn g" onclick="exportData(true)">نسخة بالمستندات</button><button class="btn g" onclick="$('#imp').click()">استعادة نسخة</button></div></div>`;
+V.more=()=>{
+ const it=[['🗓️','الجلسات والمواعيد القانونية','hearings'],['💰','الأتعاب والمصاريف','fees'],['🔨','تنفيذ الأحكام','ex'],['🗂️','الأحكام والتوكيلات','lib']];
+ return '<h2>المزيد</h2>'+it.map(([i,t,k])=>`<div class="item" onclick="go('${k}')"><span>${i}  ${t}</span><span class="mut">‹</span></div>`).join('')+bkCard()+secCard()+syCard();
+};
+function exCard(x){
+ const rem=Number(x.amount||0)-Number(x.got||0),done=x.stage===STG[5],n=x.next?Math.round((new Date(x.next+'T00:00')-new Date(todayS+'T00:00'))/864e5):0;
+ return `<div class="card"><div class="row"><b>${esc(x.title||'حكم')}</b>${acts('ex',x.id)}</div><div class="row" style="margin-top:6px"><span class="tag ${done?'on':''}">${esc(x.stage)}</span>${x.amount?`<span class="mut">محكوم ${money(x.amount)} · محصّل ${money(x.got)} · متبقي <b class="${rem>0&&!done?'late':''}">${money(rem)}</b></span>`:''}</div>${x.next&&!done?`<div class="${n<=3?'late':'mut'}">الإجراء القادم: ${fdate(x.next)}</div>`:''}${(x.log||[]).slice(-3).reverse().map(g=>`<div class="mut">• ${fdate(g.date)}: ${esc(g.text)}</div>`).join('')}<button class="btn g" style="margin-top:8px" onclick="addStep('${x.id}')">تسجيل إجراء</button></div>`;
+}
+function dlCard(x){
+ const n=Math.round((new Date(x.date+'T00:00')-new Date(todayS+'T00:00'))/864e5);
+ return `<div class="card"><div class="row"><b>${esc(x.title)}${x.done?' ✓':''}</b>${acts('dl',x.id)}</div><div class="${!x.done&&n<=3?'late':'mut'}">${fdate(x.date)} — ${x.done?'تم':n<0?'فات منذ '+(-n)+' يوم':n===0?'اليوم':'بعد '+n+' يوم'}</div><button class="btn g" style="margin-top:8px;margin-inline-end:6px" onclick="togDl('${x.id}')">${x.done?'إلغاء «تم»':'تم'}</button><button class="btn g" style="margin-top:8px" onclick="icsDl('${x.id}')">أضف للتقويم</button></div>`;
+}
+function caseView(){
+ const c=byId('cases',cid),k=byId('clients',c.client)||{},T2=[['h','الجلسات'],['d','المستندات'],['f','المالية'],['x','التنفيذ'],['m','المواعيد']],byD=(a,b)=>(b.date||'').localeCompare(a.date||'');
+ let b='';
+ if(cit==='h'){const l=S.hearings.filter(h=>h.case===cid).sort(byD);b=`<button class="btn" style="margin-bottom:10px" onclick="addFor('hearings')">+ جلسة</button>`+(l.length?l.map(hearingCard).join(''):empty('لا توجد جلسات لهذه القضية.'))}
+ if(cit==='d'){const l=S.docs.filter(x=>x.case===cid).sort(byD);b=`<div class="row" style="justify-content:flex-start;margin-bottom:10px"><button class="btn" onclick="openLib();$('#lc').value='${cid}'">+ حكم / توكيل</button><button class="btn g" onclick="pick('${cid}',0)">+ ملف</button><button class="btn g" onclick="pick('${cid}',1)">📷 تصوير</button></div>`+(l.length?l.map(x=>`<div class="card row" style="flex-wrap:nowrap"><div style="display:flex;gap:10px;align-items:center;min-width:0">${((x.type||'').startsWith('image/')||/\.(jpe?g|png|webp|gif|heic)$/i.test(x.name||''))?`<img data-doc="${x.id}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:var(--line)" onclick="showDoc('${x.id}')">`:'<div style="font-size:30px">📄</div>'}<div style="min-width:0"><b>${esc(x.kind||'مستند')}</b><div class="mut">${fdate(x.date)}</div></div></div><span style="white-space:nowrap"><button class="ico" onclick="showDoc('${x.id}')">فتح</button><button class="ico" onclick="delLib('${x.id}')" aria-label="حذف">✕</button></span></div>`).join(''):empty('لا توجد مستندات لهذه القضية.'))}
+ if(cit==='f'){const ps=S.pay.filter(p=>p.case===cid).sort(byD),es=S.exp.filter(p=>p.case===cid).sort(byD),te=es.reduce((t,x)=>t+Number(x.amount||0),0);b=`<div class="card"><div class="row"><span>الأتعاب</span><b>${money(c.fee)}</b></div><div class="row"><span>المدفوع</span><b>${money(paid(cid))}</b></div><div class="row"><span>المتبقي</span><b class="${due(c)>0?'late':''}">${money(due(c))}</b></div><div class="row"><span>المصاريف</span><b>${money(te)}</b></div><div class="row"><span>صافي المدفوع بعد المصاريف</span><b>${money(paid(cid)-te)}</b></div></div><div class="row" style="justify-content:flex-start;margin-bottom:10px"><button class="btn" onclick="addFor('pay')">+ دفعة</button><button class="btn g" onclick="addFor('exp')">+ مصروف</button></div>`+ps.map(p=>`<div class="card row"><span>دفعة<div class="mut">${fdate(p.date)}</div></span><span><b>${money(p.amount)}</b>${acts('pay',p.id)}</span></div>`).join('')+es.map(p=>`<div class="card row"><span>${esc(p.note||'مصروف')}<div class="mut">${fdate(p.date)}</div></span><span><b>${money(p.amount)}</b>${acts('exp',p.id)}</span></div>`).join('')}
+ if(cit==='x'){const l=S.ex.filter(x=>x.case===cid);b=`<button class="btn" style="margin-bottom:10px" onclick="addFor('ex')">+ ملف تنفيذ</button>`+(l.length?l.map(exCard).join(''):empty('لا يوجد تنفيذ لهذه القضية.'))}
+ if(cit==='m'){const l=S.dl.filter(x=>x.case===cid).sort((a,b)=>(a.date||'').localeCompare(b.date||''));b=`<button class="btn" style="margin-bottom:10px" onclick="addFor('dl')">+ ميعاد قانوني</button>`+(l.length?l.map(dlCard).join(''):empty('لا توجد مواعيد قانونية.'))}
+ return `<div class="card"><div class="row"><h2 style="margin:0">${esc(c.title)}</h2>${acts('cases',cid)}</div><div class="mut">${esc(c.no)} · ${esc(c.court)}</div><div class="row" style="margin-top:4px"><span>الموكل: ${esc(k.name||'—')}</span><span class="tag ${c.status==='جارية'?'on':''}">${esc(c.status)}</span></div>${k.phone?`<div class="row" style="justify-content:flex-start;gap:8px;margin-top:10px"><a class="btn g" style="text-decoration:none" href="tel:${esc(k.phone)}">اتصال</a><a class="btn g" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${wa(k.phone)}">واتساب</a></div>`:''}</div><div class="pills">${T2.map(([i,t])=>`<button class="pill ${cit===i?'on':''}" onclick="cit='${i}';render()">${t}</button>`).join('')}</div>`+b;
+}
+render=function(keep){
+ if(cid&&!byId('cases',cid))cid=null;
+ $('#today').textContent=new Date().toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+ const NAV=[['home','📅','اليوم'],['cases','⚖️','القضايا'],['clients','👥','الموكلون'],['more','☰','المزيد']];
+ const hl=cid?(['home','cases','clients'].includes(ret)?ret:'cases'):(SUB.includes(tab)?'more':tab);
+ $('#nav').innerHTML=NAV.map(([k,i,t])=>`<button class="${k===hl?'on':''}" onclick="go('${k}')"><span>${i}</span>${t}</button>`).join('');
+ const fa=document.activeElement;
+ let h;
+ if(cid)h=`<button class="back" onclick="cid=null;render()">‹ رجوع</button>`+caseView();
+ else h=(SUB.includes(tab)?`<button class="back" onclick="go('more')">‹ المزيد</button>`:'')+(tab==='home'?homeView():V[tab]());
+ $('#app').innerHTML=h;
+ if(keep&&fa&&fa.tagName==='INPUT'){const i=$('#app input');if(i){i.focus();i.setSelectionRange(q.length,q.length)}}
+ loadThumbs();
+};
 async function exportData(full){
  const out={...S};
  if(full&&S.docs.length){out.files={};for(const x of S.docs){try{const b=await tx('readonly',s=>s.get(x.id));if(b)out.files[x.id]=await new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)})}catch(e){}}}
